@@ -1,20 +1,30 @@
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
+#include <system_error>
+#include <vector>
+#include <glm/ext.hpp>
+
 #include "Renderer.h"
 #include "err.h"
-#include <glm/glm.hpp>
+#include "Shader.h"
+
+enum ShaderType{
+    BASIC,
+    NUM_SHADERS
+};
 
 struct BasicShapeInfo{
     uint32_t vao;
     uint32_t vbo;
     uint32_t ebo;
+    uint32_t numVertices;
 };
 
 enum BasicShapeType{
     TRIANGLE,
     RECTANGLE,
+    CIRCLE,
     NUM_SHAPES
 };
 
@@ -23,6 +33,8 @@ struct RenderCtx{
     size_t window_w;
     size_t window_h;
     BasicShapeInfo basicShapes[BasicShapeType::NUM_SHAPES];
+    glm::mat4 othoProjection;
+    Shader shaders[ShaderType::NUM_SHADERS];
 };
 
 static RenderCtx renderer;
@@ -32,6 +44,8 @@ bool Renderer::should_close() { return glfwWindowShouldClose(renderer.window); }
 
 static void initBasicShapes();
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+static BasicShapeInfo buildCircle(int numPoints, float radius, const glm::vec3& center);
+static bool initShaders();
 
 bool Renderer::init(int w, int h, const char *window_name){
 
@@ -63,7 +77,13 @@ bool Renderer::init(int w, int h, const char *window_name){
     glViewport(0, 0, renderer.window_w, renderer.window_h);
     glfwSetFramebufferSizeCallback(renderer.window, framebuffer_size_callback);
 
+    renderer.othoProjection = glm::ortho(0.0f,
+                                         static_cast<float>(renderer.window_w), 
+                                         static_cast<float>(renderer.window_h), 
+                                         0.0f, -1.0f, 1.0f);  
+
     initBasicShapes();
+    if(!initShaders()) return false;
 
     return true;
 };
@@ -130,8 +150,11 @@ static void initBasicShapes(){
 
     GL_CALL(glBindVertexArray(0));
 
+    auto infoCircle = buildCircle(100, 1.0f, glm::vec3(0.0f));
+
     renderer.basicShapes[BasicShapeType::TRIANGLE] = triangleInfo;
     renderer.basicShapes[BasicShapeType::RECTANGLE] = rectangleInfo;
+    renderer.basicShapes[BasicShapeType::CIRCLE] = infoCircle;
 };
 
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height){
@@ -152,4 +175,81 @@ void Renderer::drawRectangle(){
     GL_CALL(glBindVertexArray(rec.vao));
     GL_CALL(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0));
     GL_CALL(glBindVertexArray(0));
+};
+
+void Renderer::drawCircle(const glm::vec3& center, float radius){
+    auto& shader = renderer.shaders[ShaderType::BASIC];
+    //Render here
+    shader.use();
+
+    glm::mat4 modelMatrix(1.0f);
+
+    modelMatrix = glm::translate(modelMatrix, center);
+    modelMatrix = glm::scale(modelMatrix, glm::vec3(radius));
+
+    shader.setMat4("modelMatrix", modelMatrix);
+    shader.setMat4("projectionMatrix", renderer.othoProjection);
+
+    const auto& circle = renderer.basicShapes[BasicShapeType::CIRCLE];
+    GL_CALL(glBindVertexArray(circle.vao));
+    GL_CALL(glDrawArrays(GL_TRIANGLES, 0, circle.numVertices));
+    GL_CALL(glBindVertexArray(0));
+}
+
+static BasicShapeInfo buildCircle(int numPoints, float radius, const glm::vec3& center){
+    std::vector<glm::vec3> points;
+
+    //Angle between two adjacent points and the center of the circle
+    float angleStep = (2.0f * M_PI) / static_cast<float>(numPoints);
+    float alpha = angleStep;
+
+    glm::vec3 v0(center.x + radius, center.y, 0.0f);
+    points.push_back(v0);
+
+    for(int i = 0; i < numPoints; i++){
+        glm::vec3 nextV(std::cos(alpha) * radius, std::sin(alpha) * radius, 0.0f);
+
+        points.push_back(nextV);
+        alpha += angleStep;
+    }
+
+    //Get the vertex data
+    std::vector<glm::vec3> circleVertexData;
+    size_t n = points.size();
+
+    for(int i = 0; i < n - 1; i++){
+        circleVertexData.push_back(center);
+        circleVertexData.push_back(points[i]);
+        circleVertexData.push_back(points[i + 1]);
+    };
+
+    BasicShapeInfo circleInfo;
+
+    GL_CALL(glGenBuffers(1, &circleInfo.vbo));
+    GL_CALL(glGenVertexArrays(1, &circleInfo.vao));
+
+    GL_CALL(glBindVertexArray(circleInfo.vao));
+    GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, circleInfo.vbo));
+
+    GL_CALL(glBufferData(GL_ARRAY_BUFFER,
+                         circleVertexData.size() * sizeof(glm::vec3),
+                         &circleVertexData[0],
+                         GL_STATIC_DRAW));
+
+    GL_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void *)0));
+    GL_CALL(glEnableVertexAttribArray(0));
+
+    GL_CALL(glBindVertexArray(0));
+
+    circleInfo.numVertices = circleVertexData.size();
+
+    return circleInfo;
+};
+
+static bool initShaders(){
+    auto& shader = renderer.shaders[ShaderType::BASIC];
+    if(!shader.load("shaders/vertex/base.glsl", "shaders/frag/base.glsl")){
+        return false;
+    }
+    return true;
 };

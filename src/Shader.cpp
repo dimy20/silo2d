@@ -3,6 +3,7 @@
 #include <string>
 #include <glad/glad.h>
 #include <iostream>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "Shader.h"
 #include "err.h"

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <glm/vec3.hpp>
+
 struct GLFWwindow;
 
 namespace Renderer{
@@ -8,8 +10,11 @@ namespace Renderer{
     void quit();
     void update();
     bool should_close();
+
     void drawTriangle();
     void drawRectangle();
+
+    void drawCircle(const glm::vec3& center, float radius);
 
     GLFWwindow * get_window();
 };

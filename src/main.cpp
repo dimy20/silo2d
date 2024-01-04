@@ -24,22 +24,36 @@ void do_input(GLFWwindow * window){
 
 int main(){
     if(!Renderer::init(WINDOW_W, WINDOW_H, WINDOW_NAME)) exit(1);
-    Shader shader;
+    int numCircles = 10;
 
-    if(!shader.load("shaders/vertex/base.glsl", "shaders/frag/base.glsl")){
-        exit(1);
-    }
+    int yStep = WINDOW_H / numCircles;
+    int step = WINDOW_W / numCircles;
+    std::cout << yStep << "\n";
+    int r = 20;
+ 
+    std::vector<std::vector<glm::vec3>> centers(10, std::vector<glm::vec3>(10, glm::vec3(1.0f)));
 
+    int y = r + 20;
 
+    for(int i = 0; i < 10; i++){
+        int x = r + 20;
+        for(int j = 0; j < 10; j++){
+            centers[i][j] = glm::vec3(x, y, 0.0f);
+            x += step + r;
+        }
+        y += yStep;
+    };
 
     while(!Renderer::should_close()){
         do_input(Renderer::get_window());
 
         Renderer::clear();
 
-        //Render here
-        shader.use();
-        Renderer::drawRectangle();
+        for(int i = 0; i < 10; i++){
+            for(int j = 0; j < 10; j++){
+                Renderer::drawCircle(centers[i][j], r);
+            }
+        }
 
         glfwSwapBuffers(Renderer::get_window());
     };
