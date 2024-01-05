@@ -13,8 +13,8 @@ namespace Renderer{
 
     void drawTriangle();
     void drawRectangle();
-
     void drawCircle(const glm::vec3& center, float radius);
 
-    GLFWwindow * get_window();
+    GLFWwindow * getWindow();
+    double deltaTime();
 };

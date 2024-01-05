@@ -1,13 +1,20 @@
+#include <chrono>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <ratio>
 #include <stdio.h>
 #include <system_error>
 #include <vector>
 #include <glm/ext.hpp>
 
+#include <thread>
+
 #include "Renderer.h"
 #include "err.h"
 #include "Shader.h"
+
+#define TARGET_FPS 60.0f
+const double TARGET_FRAME_DURATION = 1.0f / TARGET_FPS;
 
 enum ShaderType{
     BASIC,
@@ -35,12 +42,16 @@ struct RenderCtx{
     BasicShapeInfo basicShapes[BasicShapeType::NUM_SHAPES];
     glm::mat4 othoProjection;
     Shader shaders[ShaderType::NUM_SHADERS];
+
+    double prevTime;
+    double deltaTime;
 };
 
 static RenderCtx renderer;
 
-GLFWwindow * Renderer::get_window() {return renderer.window; }
+GLFWwindow * Renderer::getWindow() {return renderer.window; }
 bool Renderer::should_close() { return glfwWindowShouldClose(renderer.window); }
+double Renderer::deltaTime() { return renderer.deltaTime; }
 
 static void initBasicShapes();
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -81,6 +92,9 @@ bool Renderer::init(int w, int h, const char *window_name){
                                          static_cast<float>(renderer.window_w), 
                                          static_cast<float>(renderer.window_h), 
                                          0.0f, -1.0f, 1.0f);  
+
+    renderer.prevTime = glfwGetTime();
+    renderer.deltaTime = 0.0f;
 
     initBasicShapes();
     if(!initShaders()) return false;
@@ -252,4 +266,26 @@ static bool initShaders(){
         return false;
     }
     return true;
+};
+
+void Renderer::update(){
+    double now = glfwGetTime();
+    double elapsedTime = now - renderer.prevTime;
+
+    if(elapsedTime >= TARGET_FRAME_DURATION){
+        renderer.prevTime = now;
+        renderer.deltaTime = elapsedTime;
+        return;
+    }
+
+    //Frame was faster than target frame time, sleep
+
+    long waitTime = (TARGET_FRAME_DURATION - elapsedTime) * 1000;
+    waitTime = std::max(waitTime, 1L);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(waitTime));
+
+    now = glfwGetTime();
+    renderer.deltaTime = now - renderer.prevTime;
+    renderer.prevTime = now;
 };

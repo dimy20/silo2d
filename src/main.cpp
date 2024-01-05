@@ -13,16 +13,17 @@
 #define WINDOW_H 600
 #define WINDOW_NAME "Silo"
 
+
 void do_input(GLFWwindow * window){
     glfwPollEvents();
 
     if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
         glfwSetWindowShouldClose(window, true);
     }
-
 }
 
 int main(){
+    
     if(!Renderer::init(WINDOW_W, WINDOW_H, WINDOW_NAME)) exit(1);
     int numCircles = 10;
 
@@ -45,7 +46,9 @@ int main(){
     };
 
     while(!Renderer::should_close()){
-        do_input(Renderer::get_window());
+        do_input(Renderer::getWindow());
+
+        Renderer::update();
 
         Renderer::clear();
 
@@ -55,7 +58,7 @@ int main(){
             }
         }
 
-        glfwSwapBuffers(Renderer::get_window());
+        glfwSwapBuffers(Renderer::getWindow());
     };
 
 
