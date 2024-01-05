@@ -1,6 +1,6 @@
 #pragma once
 
-#include <glm/vec3.hpp>
+#include <glm/vec2.hpp>
 
 struct GLFWwindow;
 
@@ -13,8 +13,10 @@ namespace Renderer{
 
     void drawTriangle();
     void drawRectangle();
-    void drawCircle(const glm::vec3& center, float radius);
+    void drawCircle(const glm::vec2& center, float radius);
 
     GLFWwindow * getWindow();
-    double deltaTime();
+    float deltaTime();
+    uint32_t WinWidth();
+    uint32_t WinHeight();
 };

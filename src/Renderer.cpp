@@ -43,15 +43,17 @@ struct RenderCtx{
     glm::mat4 othoProjection;
     Shader shaders[ShaderType::NUM_SHADERS];
 
-    double prevTime;
-    double deltaTime;
+    float prevTime;
+    float deltaTime;
 };
 
 static RenderCtx renderer;
 
 GLFWwindow * Renderer::getWindow() {return renderer.window; }
 bool Renderer::should_close() { return glfwWindowShouldClose(renderer.window); }
-double Renderer::deltaTime() { return renderer.deltaTime; }
+float Renderer::deltaTime() { return renderer.deltaTime; }
+uint32_t Renderer::WinWidth() { return renderer.window_w; }
+uint32_t Renderer::WinHeight() { return renderer.window_h; };
 
 static void initBasicShapes();
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -191,14 +193,14 @@ void Renderer::drawRectangle(){
     GL_CALL(glBindVertexArray(0));
 };
 
-void Renderer::drawCircle(const glm::vec3& center, float radius){
+void Renderer::drawCircle(const glm::vec2& center, float radius){
     auto& shader = renderer.shaders[ShaderType::BASIC];
     //Render here
     shader.use();
 
     glm::mat4 modelMatrix(1.0f);
 
-    modelMatrix = glm::translate(modelMatrix, center);
+    modelMatrix = glm::translate(modelMatrix, glm::vec3(center, 0.0f));
     modelMatrix = glm::scale(modelMatrix, glm::vec3(radius));
 
     shader.setMat4("modelMatrix", modelMatrix);
@@ -269,8 +271,8 @@ static bool initShaders(){
 };
 
 void Renderer::update(){
-    double now = glfwGetTime();
-    double elapsedTime = now - renderer.prevTime;
+    float now = glfwGetTime();
+    float elapsedTime = now - renderer.prevTime;
 
     if(elapsedTime >= TARGET_FRAME_DURATION){
         renderer.prevTime = now;

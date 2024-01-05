@@ -1,20 +1,54 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <ios>
+#include <ostream>
 #include <vector>
 #include <queue>
 #include <iostream>
+#include <random>
+#include <tuple>
 
 #include "err.h"
 #include "Renderer.h"
 #include "Shader.h"
+#include <Physics2D/Particle.h>
 
 #define WINDOW_W 800
 #define WINDOW_H 600
 #define WINDOW_NAME "Silo"
 
+struct App{
+    bool init();
+    void draw();
+    void update();
+    void doInput(GLFWwindow * window);
 
-void do_input(GLFWwindow * window){
+    std::vector<std::tuple<Physics2D::Particle, float>> mParticles;
+
+};
+
+float rand_f32(){ return static_cast<float>(rand()) / (float)RAND_MAX; }
+
+bool App::init(){
+    if(!Renderer::init(WINDOW_W, WINDOW_H, WINDOW_NAME)) return false;
+
+    srand(time(NULL));
+    
+    for(int i = 0; i < 10; i++){
+
+        int r = rand() % 15;
+        int x = rand() % static_cast<int>((Renderer::WinWidth() - r));
+        int y = rand() % static_cast<int>((Renderer::WinHeight() - r));
+        float mass = rand_f32();
+
+        Physics2D::Particle p(glm::vec2(x, y), mass);
+        mParticles.push_back(std::make_tuple(p, r));
+    }
+    return true;
+};
+
+void App::doInput(GLFWwindow * window){
     glfwPollEvents();
 
     if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
@@ -22,45 +56,83 @@ void do_input(GLFWwindow * window){
     }
 }
 
-int main(){
-    
-    if(!Renderer::init(WINDOW_W, WINDOW_H, WINDOW_NAME)) exit(1);
-    int numCircles = 10;
+int f = 0;
 
-    int yStep = WINDOW_H / numCircles;
-    int step = WINDOW_W / numCircles;
-    std::cout << yStep << "\n";
-    int r = 20;
- 
-    std::vector<std::vector<glm::vec3>> centers(10, std::vector<glm::vec3>(10, glm::vec3(1.0f)));
+std::ostream& operator << (std::ostream& out, const glm::vec2& vec){
+    out << "(";
+    out << vec.x << ", ";
+    out << vec.y << ")";
+    return out;
+}
 
-    int y = r + 20;
+void App::draw(){
+    for(const auto& p : mParticles){
+        auto& particle = std::get<0>(p);
 
-    for(int i = 0; i < 10; i++){
-        int x = r + 20;
-        for(int j = 0; j < 10; j++){
-            centers[i][j] = glm::vec3(x, y, 0.0f);
-            x += step + r;
+        Renderer::drawCircle(particle.mPosition, std::get<1>(p));
+    }
+};
+
+void App::update(){
+    glm::vec2 windForce(2.0f);
+
+    for(auto& entry : mParticles){
+        auto& p = std::get<0>(entry);
+        auto radius = std::get<1>(entry);
+
+        glm::vec2 weightForce(0.0f, 9.81f * p.mMass);
+
+        p.applyForce(windForce);
+        p.applyForce(weightForce);
+
+        p.integrate(Renderer::deltaTime());
+
+        if(p.mPosition.x - radius <= 0){
+            p.mVelocity.x *= -0.8;
+            p.mPosition.x = radius;
         }
-        y += yStep;
-    };
+
+        if(p.mPosition.x + radius >= Renderer::WinWidth()){
+            p.mVelocity.x *= -0.8;
+            p.mPosition.x = Renderer::WinWidth() - radius;
+        }
+
+        if(p.mPosition.y - radius <= 0){
+            p.mVelocity.y *= -0.8f;
+            p.mPosition.y = radius;
+        }
+
+        if(p.mPosition.y + radius >= Renderer::WinHeight()){
+            p.mVelocity.y *= -0.8f;
+            p.mPosition.y = Renderer::WinHeight() - radius;
+        }
+
+    }
+};
+
+int main(){
+    App app;
+
+    if(!app.init()){
+        exit(1);
+    }
 
     while(!Renderer::should_close()){
-        do_input(Renderer::getWindow());
+        app.doInput(Renderer::getWindow());
 
-        Renderer::update();
+        app.update();
 
         Renderer::clear();
 
-        for(int i = 0; i < 10; i++){
-            for(int j = 0; j < 10; j++){
-                Renderer::drawCircle(centers[i][j], r);
-            }
-        }
+        //Render
+        app.draw();
 
+        //Present
         glfwSwapBuffers(Renderer::getWindow());
-    };
 
+
+        Renderer::update();
+    };
 
     Renderer::quit();
 };
