@@ -12,11 +12,37 @@
 #include "err.h"
 #include "Renderer.h"
 #include "Shader.h"
+
 #include <Physics2D/Particle.h>
+#include <Physics2D/Forces.h>
 
 #define WINDOW_W 800
 #define WINDOW_H 600
 #define WINDOW_NAME "Silo"
+
+struct GameParticle{
+    Physics2D::Particle particle;
+    float radius;
+    bool onWater(const glm::vec4& waterDimensions);
+};
+
+bool GameParticle::onWater(const glm::vec4& waterDimensions){
+    const auto& pos = particle.mPosition;
+
+    int left = waterDimensions.x;
+    int right = waterDimensions.x + waterDimensions.z;
+    int top = waterDimensions.y;
+    int bottom = waterDimensions.y + waterDimensions.w;
+
+    return pos.x > left && pos.x < right && pos.y + radius > top && pos.y - radius < bottom;
+}
+
+std::ostream& operator << (std::ostream& out, const glm::vec2& vec){
+    out << "(";
+    out << vec.x << ", ";
+    out << vec.y << ")";
+    return out;
+}
 
 struct App{
     bool init();
@@ -24,8 +50,9 @@ struct App{
     void update();
     void doInput(GLFWwindow * window);
 
-    std::vector<std::tuple<Physics2D::Particle, float>> mParticles;
-
+    std::vector<GameParticle> mParticles;
+    glm::vec2 mMousePos;
+    glm::vec4 mWaterDimensions;
 };
 
 float rand_f32(){ return static_cast<float>(rand()) / (float)RAND_MAX; }
@@ -36,15 +63,26 @@ bool App::init(){
     srand(time(NULL));
     
     for(int i = 0; i < 10; i++){
+        int minSize = 5;
+        int maxSize = 20;
 
-        int r = rand() % 15;
+        int r = minSize + (maxSize - minSize) * rand_f32();
         int x = rand() % static_cast<int>((Renderer::WinWidth() - r));
         int y = rand() % static_cast<int>((Renderer::WinHeight() - r));
         float mass = rand_f32();
 
-        Physics2D::Particle p(glm::vec2(x, y), mass);
-        mParticles.push_back(std::make_tuple(p, r));
+        GameParticle p;
+        p.particle = Physics2D::Particle(glm::vec2(x, y), mass);
+        p.radius = r;
+
+        mParticles.push_back(p);
     }
+
+    mWaterDimensions = glm::vec4(0.0, 
+                                 Renderer::WinHeight() / 2, 
+                                 Renderer::WinWidth(), 
+                                 Renderer::WinHeight() / 2);
+
     return true;
 };
 
@@ -54,36 +92,52 @@ void App::doInput(GLFWwindow * window){
     if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
         glfwSetWindowShouldClose(window, true);
     }
+
+    int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+
+    if(state == GLFW_PRESS){
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        mMousePos = glm::vec2(xpos, ypos);
+    }else if(state == GLFW_RELEASE){
+        mMousePos = glm::vec2(0.0f);
+    }
+
 }
 
 int f = 0;
 
-std::ostream& operator << (std::ostream& out, const glm::vec2& vec){
-    out << "(";
-    out << vec.x << ", ";
-    out << vec.y << ")";
-    return out;
-}
-
 void App::draw(){
-    for(const auto& p : mParticles){
-        auto& particle = std::get<0>(p);
+    glm::vec3 recColor = glm::vec3(77, 93, 117) / 255.0f;
 
-        Renderer::drawCircle(particle.mPosition, std::get<1>(p));
+    Renderer::drawRectangle(mWaterDimensions.x,
+                            mWaterDimensions.y,
+                            mWaterDimensions.z,
+                            mWaterDimensions.w, recColor);
+
+    for(const auto& gameParticle: mParticles){
+        //auto& gameParticle = std::get<0>(p);
+        Renderer::drawCircle(gameParticle.particle.mPosition, gameParticle.radius, glm::vec3(1.0, 0, 0));
     }
 };
 
 void App::update(){
     glm::vec2 windForce(2.0f);
 
-    for(auto& entry : mParticles){
-        auto& p = std::get<0>(entry);
-        auto radius = std::get<1>(entry);
-
-        glm::vec2 weightForce(0.0f, 9.81f * p.mMass);
+    for(auto& gameParticle: mParticles){
+        auto& p = gameParticle.particle;
+        auto radius = gameParticle.radius;
 
         p.applyForce(windForce);
-        p.applyForce(weightForce);
+        p.applyForce(Physics2D::weight(p));
+
+        if(mMousePos != glm::vec2(0.0f)){
+            p.applyForce(glm::normalize(mMousePos - p.mPosition) * 20.0f);
+        }
+
+        if(gameParticle.onWater(mWaterDimensions)){
+            p.applyForce(Physics2D::dragForce(p, 0.001));
+        }
 
         p.integrate(Renderer::deltaTime());
 
@@ -106,7 +160,6 @@ void App::update(){
             p.mVelocity.y *= -0.8f;
             p.mPosition.y = Renderer::WinHeight() - radius;
         }
-
     }
 };
 
@@ -117,7 +170,7 @@ int main(){
         exit(1);
     }
 
-    while(!Renderer::should_close()){
+    while(!Renderer::shouldClose()){
         app.doInput(Renderer::getWindow());
 
         app.update();

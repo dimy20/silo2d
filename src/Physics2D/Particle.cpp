@@ -2,6 +2,15 @@
 
 using namespace Physics2D;
 
+Particle::Particle(){
+    mPosition = glm::vec2(0.0f);
+    mVelocity = glm::vec2(0.0f) * PIXELS_PER_METER;
+    mAcceleration = glm::vec2(0.0f) * PIXELS_PER_METER;
+    mMass = 1.0f;
+    mInvMass = 1.0f;
+    mNetForce = glm::vec2(0.0f);
+}
+
 Particle::Particle(const glm::vec2& pos,
                    float mass,
                    const glm::vec2& velocity,

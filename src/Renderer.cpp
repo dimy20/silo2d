@@ -6,7 +6,6 @@
 #include <system_error>
 #include <vector>
 #include <glm/ext.hpp>
-
 #include <thread>
 
 #include "Renderer.h"
@@ -45,23 +44,26 @@ struct RenderCtx{
 
     float prevTime;
     float deltaTime;
+    float initialized;
 };
 
 static RenderCtx renderer;
 
 GLFWwindow * Renderer::getWindow() {return renderer.window; }
-bool Renderer::should_close() { return glfwWindowShouldClose(renderer.window); }
+bool Renderer::shouldClose() { return glfwWindowShouldClose(renderer.window); }
 float Renderer::deltaTime() { return renderer.deltaTime; }
 uint32_t Renderer::WinWidth() { return renderer.window_w; }
 uint32_t Renderer::WinHeight() { return renderer.window_h; };
+bool Renderer::initialized() { return renderer.initialized; };
 
 static void initBasicShapes();
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 static BasicShapeInfo buildCircle(int numPoints, float radius, const glm::vec3& center);
 static bool initShaders();
+static BasicShapeInfo buildRectangle();
 
 bool Renderer::init(int w, int h, const char *window_name){
-
+    renderer.initialized = false;
     if(!glfwInit()){
         fprintf(stderr, "Failed to initialize Glfw\n");
         return false;
@@ -95,13 +97,16 @@ bool Renderer::init(int w, int h, const char *window_name){
                                          static_cast<float>(renderer.window_h), 
                                          0.0f, -1.0f, 1.0f);  
 
+
+
+
     renderer.prevTime = glfwGetTime();
     renderer.deltaTime = 0.0f;
 
     initBasicShapes();
     if(!initShaders()) return false;
 
-    return true;
+    return renderer.initialized = true;
 };
 
 void Renderer::clear(){
@@ -113,6 +118,36 @@ void Renderer::quit(){
     glfwDestroyWindow(renderer.window);
     glfwTerminate();
 }
+
+static BasicShapeInfo buildRectangle(){
+    BasicShapeInfo rectangleInfo;
+
+    glm::vec3 vertices[] = {
+        glm::vec3(0.0f, 1.0f, 0.0),
+        glm::vec3(1.0f, 0.0f, 0.0),
+        glm::vec3(0.0f, 0.0f, 0.0),
+
+        glm::vec3(0.0f, 1.0f, 0.0),
+        glm::vec3(1.0f, 1.0f, 0.0),
+        glm::vec3(1.0f, 0.0f, 0.0)
+    };
+
+    GL_CALL(glGenVertexArrays(1, &rectangleInfo.vao));
+    GL_CALL(glGenBuffers(1, &rectangleInfo.vbo));
+
+    GL_CALL(glBindVertexArray(rectangleInfo.vao));
+
+    GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, rectangleInfo.vbo));
+    GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW));
+
+    GL_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0));
+    GL_CALL(glEnableVertexAttribArray(0));
+
+    GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    GL_CALL(glBindVertexArray(0));
+
+   return rectangleInfo;
+};
 
 static void initBasicShapes(){
     BasicShapeInfo triangleInfo;
@@ -135,38 +170,8 @@ static void initBasicShapes(){
     GL_CALL(glEnableVertexAttribArray(0));
     GL_CALL(glBindVertexArray(0));
 
-    BasicShapeInfo rectangleInfo;
-
-    glm::vec3 rectangleVertexData[4] = {
-        glm::vec3(-0.5f, 0.5f, 0.0f),
-        glm::vec3(0.5f, 0.5f, 0.0f),
-        glm::vec3(0.5f, -0.5f, 0.0f),
-        glm::vec3(-0.5f, -0.5f, 0.0f),
-    };
-
-    uint32_t rectangleIndices[6] = {
-        0, 1, 2,
-        0, 2, 3
-    };
-
-    GL_CALL(glGenBuffers(1, &rectangleInfo.vbo));
-    GL_CALL(glGenBuffers(1, &rectangleInfo.ebo));
-    GL_CALL(glGenVertexArrays(1, &rectangleInfo.vao));
-
-    GL_CALL(glBindVertexArray(rectangleInfo.vao));
-
-    GL_CALL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rectangleInfo.ebo));
-    GL_CALL(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(rectangleIndices), rectangleIndices, GL_STATIC_DRAW));
-
-    GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, rectangleInfo.vbo));
-    GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(rectangleVertexData), rectangleVertexData, GL_STATIC_DRAW));
-
-    GL_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0));
-    GL_CALL(glEnableVertexAttribArray(0));
-
-    GL_CALL(glBindVertexArray(0));
-
     auto infoCircle = buildCircle(100, 1.0f, glm::vec3(0.0f));
+    auto rectangleInfo = buildRectangle();
 
     renderer.basicShapes[BasicShapeType::TRIANGLE] = triangleInfo;
     renderer.basicShapes[BasicShapeType::RECTANGLE] = rectangleInfo;
@@ -183,17 +188,30 @@ void Renderer::drawTriangle(){
     GL_CALL(glBindVertexArray(triangle.vao));
     GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 3));
     GL_CALL(glBindVertexArray(0));
-
 };
 
-void Renderer::drawRectangle(){
+void Renderer::drawRectangle(int x, int y, int w, int h, const glm::vec3& color){
+    auto& shader = renderer.shaders[ShaderType::BASIC];
+
+    glm::mat4 model(1.0f);
+
+
+    model = glm::translate(model, glm::vec3(x, y, 0.0f));
+    model = glm::scale(model, glm::vec3(w, h, 1.0f));
+
+    shader.use();
+    shader.setMat4("modelMatrix", model);
+    shader.setMat4("projectionMatrix", renderer.othoProjection);
+    shader.setVec3("color", color);
+
     const auto& rec = renderer.basicShapes[BasicShapeType::RECTANGLE];
+
     GL_CALL(glBindVertexArray(rec.vao));
-    GL_CALL(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0));
+    GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 6));
     GL_CALL(glBindVertexArray(0));
 };
 
-void Renderer::drawCircle(const glm::vec2& center, float radius){
+void Renderer::drawCircle(const glm::vec2& center, float radius, const glm::vec3& color){
     auto& shader = renderer.shaders[ShaderType::BASIC];
     //Render here
     shader.use();
@@ -205,6 +223,7 @@ void Renderer::drawCircle(const glm::vec2& center, float radius){
 
     shader.setMat4("modelMatrix", modelMatrix);
     shader.setMat4("projectionMatrix", renderer.othoProjection);
+    shader.setVec3("color", color);
 
     const auto& circle = renderer.basicShapes[BasicShapeType::CIRCLE];
     GL_CALL(glBindVertexArray(circle.vao));
