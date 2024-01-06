@@ -128,15 +128,16 @@ void App::update(){
         auto& p = gameParticle.particle;
         auto radius = gameParticle.radius;
 
-        p.applyForce(windForce);
-        p.applyForce(Physics2D::weight(p));
+        p.applyForce(windForce * Physics2D::PIXELS_PER_METER);
+        p.applyForce(Physics2D::weightForce(p) * Physics2D::PIXELS_PER_METER);
+        p.applyForce(Physics2D::frictionForce(p, 10.0f * Physics2D::PIXELS_PER_METER));
 
         if(mMousePos != glm::vec2(0.0f)){
-            p.applyForce(glm::normalize(mMousePos - p.mPosition) * 20.0f);
+            p.applyForce(glm::normalize(mMousePos - p.mPosition) * 20.0f * Physics2D::PIXELS_PER_METER);
         }
 
         if(gameParticle.onWater(mWaterDimensions)){
-            p.applyForce(Physics2D::dragForce(p, 0.001));
+            p.applyForce(Physics2D::dragForce(p, 0.001) * Physics2D::PIXELS_PER_METER);
         }
 
         p.integrate(Renderer::deltaTime());

@@ -24,7 +24,7 @@ Particle::Particle(const glm::vec2& pos,
 }
 
 void Particle::integrate(float deltaTime){
-    mAcceleration = mNetForce * mInvMass * PIXELS_PER_METER; // F = mA
+    mAcceleration = mNetForce * mInvMass;
 
     mVelocity += mAcceleration * deltaTime;
     mPosition += mVelocity * deltaTime;
