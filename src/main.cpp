@@ -20,8 +20,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#define WINDOW_W 800
-#define WINDOW_H 600
+#define WINDOW_W 1024
+#define WINDOW_H 768
 #define WINDOW_NAME "Silo"
 
 struct GameParticle{
@@ -192,7 +192,6 @@ int main(){
     ImGui_ImplGlfw_InitForOpenGL(Renderer::getWindow(), true);
     ImGui_ImplOpenGL3_Init("#version 450");
 
-
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -211,7 +210,6 @@ int main(){
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
         {
             static float f = 0.0f;
             static int counter = 0;

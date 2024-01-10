@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstdint>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <ratio>
@@ -9,9 +10,10 @@
 #include <thread>
 
 #include "Renderer.h"
+#include "VertexArray.h"
+#include "VertexBuffer.h"
 #include "err.h"
 #include "Shader.h"
-
 #define TARGET_FPS 60.0f
 const double TARGET_FRAME_DURATION = 1.0f / TARGET_FPS;
 
@@ -21,16 +23,15 @@ enum ShaderType{
 };
 
 struct BasicShapeInfo{
-    uint32_t vao;
-    uint32_t vbo;
-    uint32_t ebo;
-    uint32_t numVertices;
+    VertexBuffer* mVbo = NULL;
+    VertexArray* mVao = NULL;
 };
 
 enum BasicShapeType{
     TRIANGLE,
     RECTANGLE,
     CIRCLE,
+    CUBE,
     NUM_SHAPES
 };
 
@@ -61,6 +62,7 @@ static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 static BasicShapeInfo buildCircle(int numPoints, float radius, const glm::vec3& center);
 static bool initShaders();
 static BasicShapeInfo buildRectangle();
+//static BasicShapeInfo buildCube();
 
 bool Renderer::init(int w, int h, const char *window_name){
     renderer.initialized = false;
@@ -97,9 +99,6 @@ bool Renderer::init(int w, int h, const char *window_name){
                                          static_cast<float>(renderer.window_h), 
                                          0.0f, -1.0f, 1.0f);  
 
-
-
-
     renderer.prevTime = glfwGetTime();
     renderer.deltaTime = 0.0f;
 
@@ -117,7 +116,41 @@ void Renderer::clear(){
 void Renderer::quit(){
     glfwDestroyWindow(renderer.window);
     glfwTerminate();
+    for(int i = 0; i < BasicShapeType::NUM_SHAPES; i++){
+        auto& shapeInfo = renderer.basicShapes[i];
+        delete shapeInfo.mVbo;
+        delete shapeInfo.mVao;
+    }
 }
+
+BasicShapeInfo buildCube(){
+    float vertices[] = {
+        // Positions
+        -1.0f, -1.0f, -1.0f, // 0
+        1.0f, -1.0f, -1.0f,  // 1
+        1.0f, 1.0f, -1.0f,   // 2
+        -1.0f, 1.0f, -1.0f,  // 3
+        -1.0f, -1.0f, 1.0f,  // 4
+        1.0f, -1.0f, 1.0f,   // 5
+        1.0f, 1.0f, 1.0f,    // 6
+        -1.0f, 1.0f, 1.0f    // 7
+    };
+
+    unsigned int indices[] = {
+        0, 1, 2, 2, 3, 0,     // Front face
+        1, 5, 6, 6, 2, 1,     // Right face
+        5, 4, 7, 7, 6, 5,     // Back face
+        4, 0, 3, 3, 7, 4,     // Left face
+        3, 2, 6, 6, 7, 3,     // Top face
+        4, 5, 1, 1, 0, 4      // Bottom face
+    };
+
+    BasicShapeInfo cubeInfo;
+    (void)vertices;
+    (void)indices;
+
+    return cubeInfo;
+};
 
 static BasicShapeInfo buildRectangle(){
     BasicShapeInfo rectangleInfo;
@@ -132,21 +165,11 @@ static BasicShapeInfo buildRectangle(){
         glm::vec3(1.0f, 0.0f, 0.0)
     };
 
-    GL_CALL(glGenVertexArrays(1, &rectangleInfo.vao));
-    GL_CALL(glGenBuffers(1, &rectangleInfo.vbo));
+    rectangleInfo.mVbo = new VertexBuffer(vertices, sizeof(vertices), sizeof(vertices) / sizeof(vertices[0]));
+    rectangleInfo.mVao = new VertexArray();
+    rectangleInfo.mVao->setLayoutAttributeVec3(rectangleInfo.mVbo);
 
-    GL_CALL(glBindVertexArray(rectangleInfo.vao));
-
-    GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, rectangleInfo.vbo));
-    GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW));
-
-    GL_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0));
-    GL_CALL(glEnableVertexAttribArray(0));
-
-    GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, 0));
-    GL_CALL(glBindVertexArray(0));
-
-   return rectangleInfo;
+    return rectangleInfo;
 };
 
 static void initBasicShapes(){
@@ -158,17 +181,9 @@ static void initBasicShapes(){
         glm::vec3(0.0, 1.0, 0.0),
     };
 
-    GL_CALL(glGenBuffers(1, &triangleInfo.vbo));
-    GL_CALL(glGenVertexArrays(1, &triangleInfo.vao));
-
-    GL_CALL(glBindVertexArray(triangleInfo.vao));
-    GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, triangleInfo.vbo));
-
-    GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW));
-    GL_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void *)0));
-
-    GL_CALL(glEnableVertexAttribArray(0));
-    GL_CALL(glBindVertexArray(0));
+    triangleInfo.mVao = new VertexArray();
+    triangleInfo.mVbo = new VertexBuffer(positions, sizeof(positions), 3);
+    triangleInfo.mVao->setLayoutAttributeVec3(triangleInfo.mVbo);
 
     auto infoCircle = buildCircle(100, 1.0f, glm::vec3(0.0f));
     auto rectangleInfo = buildRectangle();
@@ -176,6 +191,7 @@ static void initBasicShapes(){
     renderer.basicShapes[BasicShapeType::TRIANGLE] = triangleInfo;
     renderer.basicShapes[BasicShapeType::RECTANGLE] = rectangleInfo;
     renderer.basicShapes[BasicShapeType::CIRCLE] = infoCircle;
+    renderer.basicShapes[BasicShapeType::CUBE] = buildCube();
 };
 
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height){
@@ -184,10 +200,13 @@ static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void Renderer::drawTriangle(){
     const auto& triangle = renderer.basicShapes[BasicShapeType::TRIANGLE];
+    triangle.mVao->bind(); 
+    GL_CALL(glDrawArrays(GL_TRIANGLES, 0, triangle.mVbo->mCount));
+    triangle.mVao->unBind();
+};
 
-    GL_CALL(glBindVertexArray(triangle.vao));
-    GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 3));
-    GL_CALL(glBindVertexArray(0));
+void Renderer::drawCube(const glm::vec3& position, const glm::vec3& color){
+
 };
 
 void Renderer::drawRectangle(int x, int y, int w, int h, const glm::vec3& color){
@@ -204,11 +223,11 @@ void Renderer::drawRectangle(int x, int y, int w, int h, const glm::vec3& color)
     shader.setMat4("projectionMatrix", renderer.othoProjection);
     shader.setVec3("color", color);
 
-    const auto& rec = renderer.basicShapes[BasicShapeType::RECTANGLE];
+    auto& rec = renderer.basicShapes[BasicShapeType::RECTANGLE];
 
-    GL_CALL(glBindVertexArray(rec.vao));
-    GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 6));
-    GL_CALL(glBindVertexArray(0));
+    rec.mVao->bind();
+    GL_CALL(glDrawArrays(GL_TRIANGLES, 0, rec.mVbo->mCount));
+    rec.mVao->unBind();
 };
 
 void Renderer::drawCircle(const glm::vec2& center, float radius, const glm::vec3& color){
@@ -226,9 +245,9 @@ void Renderer::drawCircle(const glm::vec2& center, float radius, const glm::vec3
     shader.setVec3("color", color);
 
     const auto& circle = renderer.basicShapes[BasicShapeType::CIRCLE];
-    GL_CALL(glBindVertexArray(circle.vao));
-    GL_CALL(glDrawArrays(GL_TRIANGLES, 0, circle.numVertices));
-    GL_CALL(glBindVertexArray(0));
+    circle.mVao->bind();
+    GL_CALL(glDrawArrays(GL_TRIANGLES, 0, circle.mVbo->mCount));
+    circle.mVao->unBind();
 }
 
 static BasicShapeInfo buildCircle(int numPoints, float radius, const glm::vec3& center){
@@ -259,24 +278,10 @@ static BasicShapeInfo buildCircle(int numPoints, float radius, const glm::vec3& 
     };
 
     BasicShapeInfo circleInfo;
-
-    GL_CALL(glGenBuffers(1, &circleInfo.vbo));
-    GL_CALL(glGenVertexArrays(1, &circleInfo.vao));
-
-    GL_CALL(glBindVertexArray(circleInfo.vao));
-    GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, circleInfo.vbo));
-
-    GL_CALL(glBufferData(GL_ARRAY_BUFFER,
-                         circleVertexData.size() * sizeof(glm::vec3),
-                         &circleVertexData[0],
-                         GL_STATIC_DRAW));
-
-    GL_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void *)0));
-    GL_CALL(glEnableVertexAttribArray(0));
-
-    GL_CALL(glBindVertexArray(0));
-
-    circleInfo.numVertices = circleVertexData.size();
+    circleInfo.mVao = new VertexArray();
+    size_t count = circleVertexData.size();
+    circleInfo.mVbo = new VertexBuffer(&circleVertexData[0], sizeof(glm::vec3) * count, count);
+    circleInfo.mVao->setLayoutAttributeVec3(circleInfo.mVbo);
 
     return circleInfo;
 };
