@@ -34,3 +34,19 @@ glm::vec2 Physics2D::frictionForce(const Particle& particle, float coef){
     glm::vec2 frictionDirection = -glm::normalize(particle.mVelocity);
     return coef * frictionDirection;
 }
+
+glm::vec2 Physics2D::make_gravitational_force(const Particle& p1, const Particle& p2, float G){
+    glm::vec2 direction = glm::normalize(p2.mPosition - p1.mPosition);
+
+    float p1p2_massses = p2.mMass * p1.mMass;
+
+    if(glm::length2(direction) == 0.0f){
+        return glm::vec2(0.0f);
+    };
+    
+    float inv_direction_length_squared = 1.0f / glm::length2(direction);
+
+    float magnitude = G * p1p2_massses * inv_direction_length_squared;
+
+    return magnitude * direction;
+};
