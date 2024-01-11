@@ -54,9 +54,11 @@ struct RenderCtx{
     size_t window_w;
     size_t window_h;
     BasicShapeInfo basicShapes[BasicShapeType::NUM_SHAPES];
+    Shader shaders[ShaderType::NUM_SHADERS];
+
     glm::mat4 othoProjection;
     glm::mat4 perspectiveProj;
-    Shader shaders[ShaderType::NUM_SHADERS];
+    glm::mat4 viewMatrix;
 
     float prevTime;
     float deltaTime;
@@ -71,6 +73,8 @@ float Renderer::deltaTime() { return renderer.deltaTime; }
 uint32_t Renderer::WinWidth() { return renderer.window_w; }
 uint32_t Renderer::WinHeight() { return renderer.window_h; };
 bool Renderer::initialized() { return renderer.initialized; };
+
+void Renderer::setView(const glm::mat4& viewMatrix){ renderer.viewMatrix = viewMatrix; }
 
 static void initBasicShapes();
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -116,6 +120,13 @@ bool Renderer::init(int w, int h, const char *window_name){
 
     float aspectRatio = static_cast<float>(renderer.window_w) / static_cast<float>(renderer.window_h);
     renderer.perspectiveProj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
+
+
+    //Default view
+    glm::mat4 viewMatrix(1.0f);
+    viewMatrix = glm::translate(viewMatrix, glm::vec3(0.0f,0.0f, -5.0f));
+    viewMatrix = glm::rotate(viewMatrix, glm::radians(-45.0f), glm::vec3(1.0f, 0.0, 0.0));
+    renderer.viewMatrix = viewMatrix;
 
     renderer.prevTime = glfwGetTime();
     renderer.deltaTime = 0.0f;
@@ -253,13 +264,13 @@ void Renderer::drawCube(const glm::vec3& position, const glm::vec3& color){
     glm::mat4 modelMatrix(1.0f);
     modelMatrix = glm::translate(modelMatrix, position);
 
-    glm::mat4 viewMatrix(1.0f);
-    viewMatrix = glm::translate(viewMatrix, glm::vec3(0.0f,0.0f, -5.0f));
-    viewMatrix = glm::rotate(viewMatrix, glm::radians(-45.0f), glm::vec3(1.0f, 0.0, 0.0));
+    //glm::mat4 viewMatrix(1.0f);
+    //viewMatrix = glm::translate(viewMatrix, glm::vec3(0.0f,0.0f, -5.0f));
+    //viewMatrix = glm::rotate(viewMatrix, glm::radians(-45.0f), glm::vec3(1.0f, 0.0, 0.0));
 
     shader.setMat4("projectionMatrix", renderer.perspectiveProj);
     shader.setMat4("modelMatrix", modelMatrix);
-    shader.setMat4("viewMatrix", viewMatrix);
+    shader.setMat4("viewMatrix", renderer.viewMatrix);
     shader.setVec3("color", color);
 
     auto& cubeInfo = renderer.basicShapes[BasicShapeType::CUBE];

@@ -2,6 +2,7 @@
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
 
 struct GLFWwindow;
 
@@ -18,6 +19,7 @@ namespace Renderer{
     void drawCircle(const glm::vec2& center, float radius, const glm::vec3& color = glm::vec3(1.0f));
 
     void drawCube(const glm::vec3& position, const glm::vec3& color);
+    void setView(const glm::mat4& viewMatrix);
 
     GLFWwindow * getWindow();
     float deltaTime();

@@ -13,6 +13,7 @@
 #include "err.h"
 #include "Renderer.h"
 #include "Shader.h"
+#include "Camera.h"
 
 #include <Physics2D/Particle.h>
 #include <Physics2D/Forces.h>
@@ -46,6 +47,8 @@ std::ostream& operator << (std::ostream& out, const glm::vec2& vec){
 }
 
 struct App{
+    App();
+
     bool init();
     void draw();
     void update();
@@ -54,9 +57,15 @@ struct App{
     std::vector<GameParticle> mParticles;
     glm::vec2 mMousePos;
     glm::vec4 mWaterDimensions;
+    Camera mCamera;
 };
 
 float rand_f32(){ return static_cast<float>(rand()) / (float)RAND_MAX; }
+
+App::App() : mCamera(glm::vec3(0.0, 0.0, 2.0f), 
+                     glm::vec3(0.0, 1.0, 0.0), 
+                     glm::vec3(0.0, 0.0, -1.0f)){
+}
 
 bool App::init(){
     if(!Renderer::init(WINDOW_W, WINDOW_H, WINDOW_NAME)) return false;
@@ -123,6 +132,7 @@ void App::draw(){
     }
     */
     glm::vec3 color(0.6, 0.7, 0.4);
+    Renderer::setView(mCamera.viewMatrix());
     Renderer::drawCube(glm::vec3(0.0f, 0.0f, 0.0f), color);
 };
 
@@ -167,6 +177,9 @@ void App::update(){
             p.mPosition.y = Renderer::WinHeight() - radius;
         }
     }
+
+    mCamera.keypressUpdate(Renderer::deltaTime(), Renderer::getWindow());
+    mCamera.mouseMoveUpdate(Renderer::getWindow());
 };
 
 int main(){
