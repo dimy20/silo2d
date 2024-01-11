@@ -17,6 +17,8 @@ namespace Renderer{
     void drawRectangle(int x, int y, int w, int h, const glm::vec3& color = glm::vec3(1.0f));
     void drawCircle(const glm::vec2& center, float radius, const glm::vec3& color = glm::vec3(1.0f));
 
+    void drawCube(const glm::vec3& position, const glm::vec3& color);
+
     GLFWwindow * getWindow();
     float deltaTime();
     uint32_t WinWidth();

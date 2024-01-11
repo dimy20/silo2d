@@ -12,6 +12,7 @@
 #include "Renderer.h"
 #include "VertexArray.h"
 #include "VertexBuffer.h"
+#include "IndexBuffer.h"
 #include "err.h"
 #include "Shader.h"
 #define TARGET_FPS 60.0f
@@ -23,8 +24,21 @@ enum ShaderType{
 };
 
 struct BasicShapeInfo{
-    VertexBuffer* mVbo = NULL;
-    VertexArray* mVao = NULL;
+    BasicShapeInfo() {
+        mVao = NULL;
+        mVbo = NULL;
+        mEbo = NULL;
+    }
+
+    BasicShapeInfo(VertexArray * vao, VertexBuffer * vbo, IndexBuffer * ebo){
+        mVao = vao;
+        mVbo = vbo;
+        mEbo = ebo;
+    }
+
+    VertexArray* mVao;
+    VertexBuffer* mVbo;
+    IndexBuffer * mEbo;
 };
 
 enum BasicShapeType{
@@ -41,6 +55,7 @@ struct RenderCtx{
     size_t window_h;
     BasicShapeInfo basicShapes[BasicShapeType::NUM_SHAPES];
     glm::mat4 othoProjection;
+    glm::mat4 perspectiveProj;
     Shader shaders[ShaderType::NUM_SHADERS];
 
     float prevTime;
@@ -62,7 +77,7 @@ static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 static BasicShapeInfo buildCircle(int numPoints, float radius, const glm::vec3& center);
 static bool initShaders();
 static BasicShapeInfo buildRectangle();
-//static BasicShapeInfo buildCube();
+static BasicShapeInfo buildCube();
 
 bool Renderer::init(int w, int h, const char *window_name){
     renderer.initialized = false;
@@ -99,6 +114,9 @@ bool Renderer::init(int w, int h, const char *window_name){
                                          static_cast<float>(renderer.window_h), 
                                          0.0f, -1.0f, 1.0f);  
 
+    float aspectRatio = static_cast<float>(renderer.window_w) / static_cast<float>(renderer.window_h);
+    renderer.perspectiveProj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
+
     renderer.prevTime = glfwGetTime();
     renderer.deltaTime = 0.0f;
 
@@ -110,46 +128,69 @@ bool Renderer::init(int w, int h, const char *window_name){
 
 void Renderer::clear(){
     GL_CALL(glClearColor(3.0f / 255.0, 80.0f / 255.0, 150.0 / 255.0f, 1.0f));
-    GL_CALL(glClear(GL_COLOR_BUFFER_BIT));
+    GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 }
 
 void Renderer::quit(){
-    glfwDestroyWindow(renderer.window);
-    glfwTerminate();
     for(int i = 0; i < BasicShapeType::NUM_SHAPES; i++){
         auto& shapeInfo = renderer.basicShapes[i];
         delete shapeInfo.mVbo;
         delete shapeInfo.mVao;
+        delete shapeInfo.mEbo;
     }
+
+    glfwDestroyWindow(renderer.window);
+    glfwTerminate();
 }
 
-BasicShapeInfo buildCube(){
-    float vertices[] = {
-        // Positions
-        -1.0f, -1.0f, -1.0f, // 0
-        1.0f, -1.0f, -1.0f,  // 1
-        1.0f, 1.0f, -1.0f,   // 2
-        -1.0f, 1.0f, -1.0f,  // 3
-        -1.0f, -1.0f, 1.0f,  // 4
-        1.0f, -1.0f, 1.0f,   // 5
-        1.0f, 1.0f, 1.0f,    // 6
-        -1.0f, 1.0f, 1.0f    // 7
+static BasicShapeInfo buildCube(){
+    const glm::vec3 vertices[] = {
+        // Front face
+        glm::vec3(-0.5f, -0.5f,  0.5f),  // Bottom-left
+        glm::vec3(0.5f, -0.5f,  0.5f),  // Bottom-right
+        glm::vec3(0.5f,  0.5f,  0.5f),  // Top-right
+        glm::vec3(-0.5f,  0.5f,  0.5f),  // Top-left
+
+        // Back face
+        glm::vec3(-0.5f, -0.5f, -0.5f),  // Bottom-left
+        glm::vec3(0.5f, -0.5f, -0.5f),  // Bottom-right
+        glm::vec3(0.5f,  0.5f, -0.5f),  // Top-right
+        glm::vec3(-0.5f,  0.5f, -0.5f)  // Top-left
     };
 
-    unsigned int indices[] = {
-        0, 1, 2, 2, 3, 0,     // Front face
-        1, 5, 6, 6, 2, 1,     // Right face
-        5, 4, 7, 7, 6, 5,     // Back face
-        4, 0, 3, 3, 7, 4,     // Left face
-        3, 2, 6, 6, 7, 3,     // Top face
-        4, 5, 1, 1, 0, 4      // Bottom face
+    GLuint indices[] = {
+        // Front face
+        0, 1, 2,
+        2, 3, 0,
+
+        // Right face
+        1, 5, 6,
+        6, 2, 1,
+
+        // Back face
+        7, 6, 5,
+        5, 4, 7,
+
+        // Left face
+        4, 0, 3,
+        3, 7, 4,
+
+        // Bottom face
+        4, 5, 1,
+        1, 0, 4,
+
+        // Top face
+        3, 2, 6,
+        6, 7, 3
     };
 
-    BasicShapeInfo cubeInfo;
-    (void)vertices;
-    (void)indices;
+    VertexArray * vao = new VertexArray();
+    VertexBuffer * vbo = new VertexBuffer(vertices, sizeof(vertices), 36);
+    IndexBuffer * ebo = new IndexBuffer(indices, sizeof(indices), vao);
 
-    return cubeInfo;
+    vao->setLayoutAttributeVec3(vbo);
+
+    return BasicShapeInfo(vao, vbo, ebo);
 };
 
 static BasicShapeInfo buildRectangle(){
@@ -206,7 +247,27 @@ void Renderer::drawTriangle(){
 };
 
 void Renderer::drawCube(const glm::vec3& position, const glm::vec3& color){
+    auto& shader = renderer.shaders[ShaderType::BASIC];
+    shader.use();
 
+    glm::mat4 modelMatrix(1.0f);
+    modelMatrix = glm::translate(modelMatrix, position);
+
+    glm::mat4 viewMatrix(1.0f);
+    viewMatrix = glm::translate(viewMatrix, glm::vec3(0.0f,0.0f, -5.0f));
+    viewMatrix = glm::rotate(viewMatrix, glm::radians(-45.0f), glm::vec3(1.0f, 0.0, 0.0));
+
+    shader.setMat4("projectionMatrix", renderer.perspectiveProj);
+    shader.setMat4("modelMatrix", modelMatrix);
+    shader.setMat4("viewMatrix", viewMatrix);
+    shader.setVec3("color", color);
+
+    auto& cubeInfo = renderer.basicShapes[BasicShapeType::CUBE];
+    cubeInfo.mVao->bind();
+    cubeInfo.mEbo->bind();
+    GL_CALL(glDrawElements(GL_TRIANGLES, cubeInfo.mEbo->mCount, GL_UNSIGNED_INT, 0));
+    cubeInfo.mVao->unBind();
+    cubeInfo.mEbo->unBind();
 };
 
 void Renderer::drawRectangle(int x, int y, int w, int h, const glm::vec3& color){
